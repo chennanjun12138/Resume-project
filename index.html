@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 智能简历分析系统</title>
+  <style>
+    :root { --primary: #2563eb; --bg: #f8fafc; --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; }
+    body { max-width: 900px; margin: 0 auto; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: #334155; }
+    h1 { text-align: center; color: #1e293b; margin-bottom: 40px; }
+    
+    .card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    h2 { font-size: 1.1rem; color: #64748b; margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
+    
+    textarea { width: 100%; height: 120px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; resize: vertical; box-sizing: border-box; font-family: inherit; }
+    input[type="file"] { display: block; width: 100%; padding: 10px; background: #f1f5f9; border-radius: 6px; }
+    
+    .btn-analyze { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+    .btn-analyze:hover { background: #1d4ed8; }
+    .btn-analyze:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    #result-area { display: none; margin-top: 30px; border-top: 4px solid var(--primary); }
+    
+    /* 报告头部 */
+    .report-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; }
+    .candidate-name { font-size: 1.8rem; font-weight: bold; color: #1e293b; }
+    .candidate-sub { color: #64748b; margin-top: 5px; }
+    
+    /* 总分徽章 */
+    .score-badge { text-align: center; width: 90px; height: 90px; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-shrink: 0; }
+    .score-val { font-size: 2rem; line-height: 1; }
+    .score-label { font-size: 0.7rem; opacity: 0.9; }
+
+    /* 维度评分条 */
+    .score-breakdown { margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 8px; }
+    .breakdown-item { display: flex; flex-direction: column; }
+    .breakdown-label { font-size: 0.8rem; color: #64748b; margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .progress-bg { background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--primary); border-radius: 4px; width: 0; transition: width 1s ease-out; }
+
+    /* 关键词标签 */
+    .keywords-box { margin-bottom: 20px; }
+    .keyword-tag { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; border: 1px solid #bae6fd; }
+
+    /* 信息网格 */
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .info-item { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .info-label { font-size: 0.8rem; color: #64748b; display: block; margin-bottom: 4px; }
+    .info-text { font-weight: 600; color: #334155; word-break: break-all; }
+
+    .section-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; color: #1e293b; }
+    .section-title::before { content: ''; display: inline-block; width: 4px; height: 16px; background: var(--primary); margin-right: 8px; border-radius: 2px; }
+
+    .edu-list { margin-bottom: 25px; padding-left: 0; list-style: none; }
+    .edu-item { background: #fff; border-bottom: 1px dashed #e2e8f0; padding: 8px 0; color: #475569; }
+
+    .summary-box { background: #eff6ff; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary); color: #1e40af; line-height: 1.6; margin-bottom: 25px; }
+    
+    .analysis-content { line-height: 1.7; color: #475569; white-space: pre-wrap; }
+    .highlight-good { color: var(--success); font-weight: bold; background: #f0fdf4; padding: 2px 6px; border-radius: 4px; }
+    .highlight-bad { color: var(--danger); font-weight: bold; background: #fef2f2; padding: 2px 6px; border-radius: 4px; }
+    .cached-badge { display: inline-block; background: #e0f2fe; color: #0284c7; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; vertical-align: middle; border: 1px solid #bae6fd; }
+
+    .spinner { display: none; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<h1>🚀 AI 智能简历分析系统</h1>
+
+<div class="card">
+  <h2>1. 上传简历 (PDF)</h2>
+  <input type="file" id="file" accept="application/pdf" />
+</div>
+
+<div class="card">
+  <h2>2. 输入岗位描述 (JD)</h2>
+  <textarea id="jd" placeholder="请粘贴岗位 JD，例如：
+1. 熟练掌握 Python/Java
+2. 有 3 年以上后端开发经验..."></textarea>
+</div>
+
+<button class="btn-analyze" onclick="analyze()" id="btn">✨ 开始深度分析</button>
+<div class="spinner" id="spinner"></div>
+
+<div id="result-area" class="card">
+  <!-- 结果将在此处渲染 -->
+</div>
+
+<script>
+  // ⚠️ 请确认这是你最新的公网地址 (通常不需要变，除非你删除了函数重建)
+  const API_URL = "https://resum-check-scsgutsccm.cn-hangzhou.fcapp.run/check/analyze";
+
+  async function analyze() {
+    const fileInput = document.getElementById("file");
+    const jdInput = document.getElementById("jd");
+    const resultArea = document.getElementById("result-area");
+    const btn = document.getElementById("btn");
+    const spinner = document.getElementById("spinner");
+
+    if (!fileInput.files.length) { alert("请先上传 PDF 简历"); return; }
+    if (!jdInput.value.trim()) { alert("请输入岗位 JD"); return; }
+
+    btn.disabled = true;
+    btn.textContent = "AI 正在深度思考中...";
+    spinner.style.display = "block";
+    resultArea.style.display = "none";
+    resultArea.innerHTML = "";
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+    formData.append("jd", jdInput.value.trim());
+
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        body: formData
+      });
+      
+      const data = await res.json();
+      
+      if(data.error) {
+        throw new Error(data.error);
+      }
+
+      renderReport(data);
+      resultArea.style.display = "block";
+
+    } catch (err) {
+      alert("分析失败：" + err.message);
+      console.error(err);
+      resultArea.innerHTML = `<p style="color:red; text-align:center;">❌ ${err.message}</p>`;
+      resultArea.style.display = "block";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "✨ 开始深度分析";
+      spinner.style.display = "none";
+    }
+  }
+
+  function renderReport(data) {
+    const resultArea = document.getElementById("result-area");
+    const basic = data.basic_info || {};
+    const score = data.match_score || 0;
+    const breakdown = data.score_breakdown || {};
+    const jdMeta = data.jd_analysis || {};
+    
+    // 缓存标记
+    const cacheTag = data._is_cached ? '<span class="cached-badge">⚡️ 极速缓存命中</span>' : '';
+
+    // 分数颜色逻辑
+    let scoreColor = '#ef4444';
+    if(score >= 80) scoreColor = '#22c55e';
+    else if(score >= 60) scoreColor = '#f59e0b';
+
+    // 生成关键词标签
+    let keywordsHtml = '';
+    if(jdMeta.keywords && jdMeta.keywords.length) {
+        keywordsHtml = `<div class="keywords-box">` + 
+            jdMeta.keywords.map(k => `<span class="keyword-tag">#${k}</span>`).join('') + 
+            `</div>`;
+    }
+
+    // 生成维度评分条 HTML (安全获取，默认为 0)
+    const renderBar = (label, val) => `
+        <div class="breakdown-item">
+            <div class="breakdown-label"><span>${label}</span><span>${val || 0}分</span></div>
+            <div class="progress-bg"><div class="progress-fill" style="width: ${val || 0}%; background-color: ${val>=80?'#22c55e':(val>=60?'#f59e0b':'#ef4444')}"></div></div>
+        </div>
+    `;
+
+    // 格式化分析文本
+    let analysisHtml = (data.match_analysis || "无详细分析")
+        .replace(/\n/g, '<br/>')
+        .replace(/(核心优势：)/g, '<br/><span class="highlight-good">✅ $1</span>')
+        .replace(/(差距分析：)/g, '<br/><span class="highlight-bad">⚠️ $1</span>')
+        .replace(/(综合建议：)/g, '<br/><span style="color:#2563eb;font-weight:bold">💡 $1</span>');
+
+    // 学历列表
+    let eduHtml = '';
+    if (data.education_background && data.education_background.length > 0) {
+        eduHtml = `<div class="section-title">🎓 学历背景</div><ul class="edu-list">` + 
+            data.education_background.map(item => `<li class="edu-item">${item}</li>`).join('') + 
+            `</ul>`;
+    }
+
+    const html = `
+      <div class="report-header">
+        <div style="flex:1">
+          <div class="candidate-name">${basic.name || '候选人'} ${cacheTag}</div>
+          
+          <!-- 维度评分展示区 -->
+          <div class="score-breakdown">
+             ${renderBar('🛠 技能匹配 (40%)', breakdown.skill_score)}
+             ${renderBar('📈 经验匹配 (30%)', breakdown.experience_score)}
+             ${renderBar('🎓 学历基础 (20%)', breakdown.education_score)}
+             ${renderBar('🌟 综合素质 (10%)', breakdown.general_score)}
+          </div>
+        </div>
+        
+        <div style="margin-left: 20px; text-align: center;">
+            <div class="score-badge" style="background-color: ${scoreColor}">
+            <span class="score-val">${score}</span>
+            <span class="score-label">综合匹配度</span>
+            </div>
+        </div>
+      </div>
+
+      <div class="section-title">🔑 岗位核心关键词</div>
+      ${keywordsHtml || '<p style="color:#94a3b8;font-size:0.9rem">未提取到关键词</p>'}
+
+      <div class="section-title">📋 基本信息</div>
+      <div class="info-grid">
+        <div class="info-item"><span class="info-label">📧 邮箱</span><div class="info-text">${basic.email || '-'}</div></div>
+        <div class="info-item"><span class="info-label">📱 联系电话</span><div class="info-text">${basic.phone || '-'}</div></div>
+        <div class="info-item"><span class="info-label">🎓 学历</span><div class="info-text">${basic.education || '-'}</div></div>
+        <div class="info-item"><span class="info-label">📍 地址</span><div class="info-text">${basic.address || '-'}</div></div>
+        <div class="info-item"><span class="info-label">🎯 求职意向</span><div class="info-text">${basic.job_intention || '-'}</div></div>
+        <div class="info-item"><span class="info-label">⏳ 工作年限</span><div class="info-text">${basic.years_of_experience || '-'}</div></div>
+      </div>
+
+      ${eduHtml}
+
+      <div class="section-title">📝 综合评价</div>
+      <div class="summary-box">
+        ${data.summary || '暂无总结'}
+      </div>
+
+      <div class="section-title">🔍 深度分析报告</div>
+      <div class="analysis-content">
+        ${analysisHtml}
+      </div>
+    `;
+
+    resultArea.innerHTML = html;
+  }
+</script>
+
+</body>
+</html>
